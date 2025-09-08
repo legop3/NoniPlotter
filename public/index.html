@@ -3,21 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <title>NoniPlotter</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <style>
-    body { font-family: sans-serif; text-align: center; }
-    #map { height: 80vh; }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <h1>NoniPlotter</h1>
-  <button id="toggleMap">Toggle Map</button>
-  <div id="map"></div>
-  <form id="uploadForm">
-    <input type="file" name="plotfile" />
-    <button type="submit">Upload</button>
-  </form>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <header>
+    <h1>NoniPlotter</h1>
+  </header>
+  <main>
+    <div id="canvasContainer">
+      <canvas id="plotCanvas"></canvas>
+    </div>
+    <aside id="sidebar">
+      <h2>Tracks</h2>
+      <ul id="trackList"></ul>
+      <form id="uploadForm">
+        <input type="file" name="plotfile" />
+        <button type="submit">Upload</button>
+      </form>
+    </aside>
+  </main>
   <script src="app.js"></script>
 </body>
 </html>
