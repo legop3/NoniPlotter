@@ -7,10 +7,16 @@ let isDragging = false;
 let lastX = 0;
 let lastY = 0;
 const sidebar = document.getElementById('sidebar');
+const backdrop = document.getElementById('backdrop');
+const menuToggle = document.getElementById('menuToggle');
 
-document.getElementById('menuToggle').addEventListener('click', () => {
+function toggleMenu() {
   sidebar.classList.toggle('open');
-});
+  backdrop.classList.toggle('show');
+}
+
+menuToggle.addEventListener('click', toggleMenu);
+backdrop.addEventListener('click', toggleMenu);
 
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
