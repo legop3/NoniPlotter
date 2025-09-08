@@ -25,6 +25,7 @@ main {
   height: 100%;
   background: #fff;
   cursor: grab;
+  touch-action: none;
 }
 
 #sidebar {

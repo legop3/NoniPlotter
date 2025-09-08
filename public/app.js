@@ -176,6 +176,62 @@ canvas.addEventListener('wheel', e => {
   zoom(factor, x, y);
 });
 
+// Touch support: pan with one finger, pinch with two
+let pinchDist = 0;
+let pinchMidX = 0;
+let pinchMidY = 0;
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    isDragging = true;
+    lastX = t.clientX;
+    lastY = t.clientY;
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    const [t1, t2] = e.touches;
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    pinchDist = Math.hypot(dx, dy);
+    const rect = canvas.getBoundingClientRect();
+    pinchMidX = (t1.clientX + t2.clientX) / 2 - rect.left;
+    pinchMidY = (t1.clientY + t2.clientY) / 2 - rect.top;
+  }
+});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isDragging) {
+    const t = e.touches[0];
+    const dx = t.clientX - lastX;
+    const dy = t.clientY - lastY;
+    view.originLon -= dx / view.scale;
+    view.originLat += dy / view.scale;
+    lastX = t.clientX;
+    lastY = t.clientY;
+    draw();
+  } else if (e.touches.length === 2) {
+    const [t1, t2] = e.touches;
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    const dist = Math.hypot(dx, dy);
+    const factor = dist / pinchDist;
+    zoom(factor, pinchMidX, pinchMidY);
+    pinchDist = dist;
+  }
+});
+
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length === 0) {
+    isDragging = false;
+  }
+});
+
+canvas.addEventListener('touchcancel', () => {
+  isDragging = false;
+});
+
 window.addEventListener('mouseup', () => {
   isDragging = false;
   canvas.style.cursor = 'grab';
