@@ -37,7 +37,9 @@ function parsePlotFile(filePath) {
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/tracks', (req, res) => {
-  const files = fs.readdirSync(plotsDir).filter(f => f.endsWith('.txt') || f.endsWith('.plot') || f.endsWith('.dat') || f.endsWith('.plt') || f.endsWith('.log') || f.endsWith('.csv'));
+  const files = fs
+    .readdirSync(plotsDir)
+    .filter(f => fs.statSync(path.join(plotsDir, f)).isFile());
   const tracks = files.map(f => ({
     id: f,
     coords: parsePlotFile(path.join(plotsDir, f))
