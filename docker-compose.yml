@@ -5,6 +5,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./plots:/app/plots
+      - plots:/app/plots
     environment:
       - NODE_ENV=production
+
+volumes:
+  plots:
