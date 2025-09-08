@@ -168,13 +168,21 @@ function renderTrackList() {
   });
 }
 
+function hashString(str) {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+  }
+  return hash >>> 0;
+}
+
 async function loadTracks() {
   const res = await fetch('/api/tracks');
   const data = await res.json();
   tracks = data.map(t => ({
     id: t.id,
     coords: t.coords,
-    color: `hsl(${Math.floor(Math.random() * 360)}, 100%, 60%)`,
+    color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
     visible: true
   }));
   worldBounds = computeWorldBounds();
