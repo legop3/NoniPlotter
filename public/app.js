@@ -9,6 +9,7 @@ let lastY = 0;
 const sidebar = document.getElementById('sidebar');
 const backdrop = document.getElementById('backdrop');
 const menuToggle = document.getElementById('menuToggle');
+const themeToggle = document.getElementById('themeToggle');
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -17,6 +18,42 @@ function toggleMenu() {
 
 menuToggle.addEventListener('click', toggleMenu);
 backdrop.addEventListener('click', toggleMenu);
+
+function getCookie(name) {
+  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return m ? m[2] : null;
+}
+
+function setTheme(theme, persist = true) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (persist) {
+    document.cookie = `theme=${theme};path=/;max-age=31536000`;
+  }
+  if (themeToggle) {
+    themeToggle.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+  }
+  draw();
+}
+
+function initTheme() {
+  const saved = getCookie('theme');
+  if (saved) {
+    setTheme(saved, false);
+  } else {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setTheme(mq.matches ? 'dark' : 'light', false);
+    mq.addEventListener('change', e => {
+      if (!getCookie('theme')) setTheme(e.matches ? 'dark' : 'light', false);
+    });
+  }
+}
+
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  });
+}
 
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
@@ -76,7 +113,8 @@ function drawGrid() {
   const endLon = view.originLon + canvas.width / view.scale;
   const startLat = Math.ceil(view.originLat / step) * step;
   const endLat = view.originLat - canvas.height / view.scale;
-  ctx.strokeStyle = '#eee';
+  const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim();
+  ctx.strokeStyle = gridColor;
   for (let lon = startLon; lon <= endLon; lon += step) {
     const x = (lon - view.originLon) * view.scale;
     ctx.beginPath();
@@ -136,7 +174,7 @@ async function loadTracks() {
   tracks = data.map(t => ({
     id: t.id,
     coords: t.coords,
-    color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
+    color: `hsl(${Math.floor(Math.random() * 360)}, 100%, 60%)`,
     visible: true
   }));
   worldBounds = computeWorldBounds();
@@ -248,6 +286,7 @@ window.addEventListener('mouseup', () => {
   canvas.style.cursor = 'grab';
 });
 
+initTheme();
 resizeCanvas();
 canvas.style.cursor = 'grab';
 loadTracks();
