@@ -32,7 +32,8 @@ main {
 #menuToggle {
   position: fixed;
   top: 10px;
-  left: 10px;
+  right: 10px;
+  left: auto;
   z-index: 30;
   background: #20232a;
   color: #fff;
@@ -42,6 +43,7 @@ main {
   font-size: 1.4rem;
   cursor: pointer;
   display: none;
+  width: auto;
 }
 
 #backdrop {
@@ -82,7 +84,7 @@ main {
   vertical-align: middle;
 }
 
-  button, input[type="file"] {
+#sidebar button, #sidebar input[type="file"] {
     width: 100%;
     margin-top: 0.5rem;
   }
@@ -99,10 +101,11 @@ main {
     position: fixed;
     top: 0;
     bottom: 0;
-    left: 0;
+    right: 0;
+    left: auto;
     width: 80vw;
     max-width: 300px;
-    transform: translateX(-100%);
+    transform: translateX(100%);
     transition: transform 0.3s ease;
   }
   #sidebar.open {
