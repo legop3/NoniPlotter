@@ -6,6 +6,11 @@ let view = { scale: 1, originLat: 0, originLon: 0 };
 let isDragging = false;
 let lastX = 0;
 let lastY = 0;
+const sidebar = document.getElementById('sidebar');
+
+document.getElementById('menuToggle').addEventListener('click', () => {
+  sidebar.classList.toggle('open');
+});
 
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
