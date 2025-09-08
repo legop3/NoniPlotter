@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>NoniPlotter</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    #map { height: 80vh; }
+  </style>
+</head>
+<body>
+  <h1>NoniPlotter</h1>
+  <button id="toggleMap">Toggle Map</button>
+  <div id="map"></div>
+  <form id="uploadForm">
+    <input type="file" name="plotfile" />
+    <button type="submit">Upload</button>
+  </form>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
