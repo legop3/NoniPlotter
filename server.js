@@ -29,8 +29,9 @@ function parsePlotFile(filePath) {
   for (const line of lines) {
     const parts = line.split('|');
     if (parts.length > 4) {
-      let lat = parseFloat(parts[3]);
-      let lon = parseFloat(parts[4]);
+      // Files store longitude before latitude; flip them so north maps upward
+      let lon = parseFloat(parts[3]);
+      let lat = parseFloat(parts[4]);
       if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
         if (units === 'rad') {
           lat = (lat * 180) / Math.PI;
