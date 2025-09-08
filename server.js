@@ -21,15 +21,16 @@ const upload = multer({ storage });
 function parsePlotFile(filePath) {
   const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/).filter(Boolean);
   const coords = [];
+  const toDegrees = val => (Math.abs(val) <= Math.PI ? val * (180 / Math.PI) : val);
   for (const line of lines) {
     const parts = line.split('|');
     if (parts.length > 4) {
-      const latRad = parseFloat(parts[3]);
-      const lonRad = parseFloat(parts[4]);
-      if (!Number.isNaN(latRad) && !Number.isNaN(lonRad)) {
-        const latDeg = latRad * (180 / Math.PI);
-        const lonDeg = lonRad * (180 / Math.PI);
-        coords.push([latDeg, lonDeg]);
+      const rawLat = parseFloat(parts[3]);
+      const rawLon = parseFloat(parts[4]);
+      if (!Number.isNaN(rawLat) && !Number.isNaN(rawLon)) {
+        const lat = toDegrees(rawLat);
+        const lon = toDegrees(rawLon);
+        coords.push([lat, lon]);
       }
     }
   }
@@ -41,11 +42,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/tracks', (req, res) => {
   const files = fs
     .readdirSync(plotsDir)
-    .filter(f => fs.statSync(path.join(plotsDir, f)).isFile());
-  const tracks = files.map(f => ({
-    id: f,
-    coords: parsePlotFile(path.join(plotsDir, f))
-  }));
+    .filter(f => fs.statSync(path.join(plotsDir, f)).isFile() && !f.startsWith('.'));
+  const tracks = files
+    .map(f => ({ id: f, coords: parsePlotFile(path.join(plotsDir, f)) }))
+    .filter(t => t.coords.length);
   res.json(tracks);
 });
 

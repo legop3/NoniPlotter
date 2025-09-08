@@ -10,6 +10,7 @@ async function loadTracks() {
   trackLayer.clearLayers();
   let bounds = null;
   tracks.forEach(t => {
+    if (!t.coords || t.coords.length === 0) return;
     const color = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
     const poly = L.polyline(t.coords, { color }).addTo(trackLayer);
     bounds = bounds ? bounds.extend(poly.getBounds()) : poly.getBounds();
