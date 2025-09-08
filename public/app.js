@@ -7,6 +7,15 @@ let isDragging = false;
 let lastX = 0;
 let lastY = 0;
 
+function zoom(factor, centerX, centerY) {
+  const worldX = view.originLon + centerX / view.scale;
+  const worldY = view.originLat - centerY / view.scale;
+  view.scale *= factor;
+  view.originLon = worldX - centerX / view.scale;
+  view.originLat = worldY + centerY / view.scale;
+  draw();
+}
+
 function resizeCanvas() {
   const prevW = canvas.width || 0;
   const prevH = canvas.height || 0;
@@ -48,15 +57,24 @@ function fitView() {
 }
 
 function drawGrid() {
-  const lines = 10;
+  const targetPx = 100;
+  const degPerLine = targetPx / view.scale;
+  const pow = Math.pow(10, Math.floor(Math.log10(degPerLine)));
+  const step = [1, 2, 5, 10].find(s => degPerLine <= s * pow) * pow;
+  const startLon = Math.floor(view.originLon / step) * step;
+  const endLon = view.originLon + canvas.width / view.scale;
+  const startLat = Math.ceil(view.originLat / step) * step;
+  const endLat = view.originLat - canvas.height / view.scale;
   ctx.strokeStyle = '#eee';
-  for (let i = 0; i <= lines; i++) {
-    const x = (canvas.width / lines) * i;
-    const y = (canvas.height / lines) * i;
+  for (let lon = startLon; lon <= endLon; lon += step) {
+    const x = (lon - view.originLon) * view.scale;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, canvas.height);
     ctx.stroke();
+  }
+  for (let lat = startLat; lat >= endLat; lat -= step) {
+    const y = (view.originLat - lat) * view.scale;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(canvas.width, y);
@@ -140,6 +158,22 @@ window.addEventListener('mousemove', e => {
   lastX = e.clientX;
   lastY = e.clientY;
   draw();
+});
+
+document.getElementById('zoomIn').addEventListener('click', () => {
+  zoom(1.2, canvas.width / 2, canvas.height / 2);
+});
+document.getElementById('zoomOut').addEventListener('click', () => {
+  zoom(1 / 1.2, canvas.width / 2, canvas.height / 2);
+});
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  zoom(factor, x, y);
 });
 
 window.addEventListener('mouseup', () => {
