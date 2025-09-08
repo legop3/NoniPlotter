@@ -199,6 +199,21 @@ document.getElementById('uploadForm').addEventListener('submit', async e => {
   loadTracks();
 });
 
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  const ids = tracks.filter(t => t.visible).map(t => t.id);
+  if (!ids.length) return;
+  const res = await fetch(`/api/download?ids=${ids.map(encodeURIComponent).join(',')}`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'tracks.gpx';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
 canvas.addEventListener('mousedown', e => {
   isDragging = true;
   lastX = e.clientX;

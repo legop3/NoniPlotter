@@ -67,6 +67,33 @@ app.post('/api/upload', upload.single('plotfile'), (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/api/download', async (req, res) => {
+  const ids = (req.query.ids || '').split(',').map(id => path.basename(id)).filter(Boolean);
+  if (!ids.length) {
+    return res.status(400).send('No tracks specified');
+  }
+  try {
+    const trks = [];
+    for (const id of ids) {
+      const full = path.join(plotsDir, id);
+      const coords = await parsePlotFile(full).catch(() => []);
+      if (coords.length) {
+        const pts = coords
+          .map(([lat, lon]) => `<trkpt lat="${lat}" lon="${lon}" />`)
+          .join('');
+        trks.push(`<trk><name>${id}</name><trkseg>${pts}</trkseg></trk>`);
+      }
+    }
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<gpx version="1.1" creator="NoniPlotter" xmlns="http://www.topografix.com/GPX/1/1">${trks.join('')}</gpx>`;
+    res.setHeader('Content-Type', 'application/gpx+xml');
+    res.setHeader('Content-Disposition', 'attachment; filename="tracks.gpx"');
+    res.send(gpx);
+  } catch (err) {
+    res.status(500).send('Failed to generate GPX');
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server grooving on port ${PORT}`);
 });
