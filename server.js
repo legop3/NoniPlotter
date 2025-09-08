@@ -20,16 +20,22 @@ const upload = multer({ storage });
 
 function parsePlotFile(filePath) {
   const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/).filter(Boolean);
+  let units = 'deg';
+  if (lines[0] && /^#?\s*units\s*=\s*rad/i.test(lines[0])) {
+    units = 'rad';
+    lines.shift();
+  }
   const coords = [];
-  const toDegrees = val => (Math.abs(val) <= Math.PI ? val * (180 / Math.PI) : val);
   for (const line of lines) {
     const parts = line.split('|');
     if (parts.length > 4) {
-      const rawLat = parseFloat(parts[3]);
-      const rawLon = parseFloat(parts[4]);
-      if (!Number.isNaN(rawLat) && !Number.isNaN(rawLon)) {
-        const lat = toDegrees(rawLat);
-        const lon = toDegrees(rawLon);
+      let lat = parseFloat(parts[3]);
+      let lon = parseFloat(parts[4]);
+      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+        if (units === 'rad') {
+          lat = (lat * 180) / Math.PI;
+          lon = (lon * 180) / Math.PI;
+        }
         coords.push([lat, lon]);
       }
     }
