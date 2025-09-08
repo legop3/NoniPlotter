@@ -174,17 +174,69 @@ function renderTrackList() {
   });
 }
 
+function haversine(a, b) {
+  const R = 6371000; // metres
+  const toRad = x => x * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lon - a.lon);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const s = Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+function computeStats(points) {
+  const start = points[0];
+  const end = points[points.length - 1];
+  let minAlt = Infinity, maxAlt = -Infinity;
+  let maxSpeed = -Infinity;
+  let dist = 0;
+  points.forEach((p, i) => {
+    if (Number.isFinite(p.alt)) {
+      if (p.alt < minAlt) minAlt = p.alt;
+      if (p.alt > maxAlt) maxAlt = p.alt;
+    }
+    if (Number.isFinite(p.speed) && p.speed > maxSpeed) maxSpeed = p.speed;
+    if (i > 0) dist += haversine(points[i - 1], p);
+  });
+  return {
+    start,
+    end,
+    minAlt: Number.isFinite(minAlt) ? minAlt : null,
+    maxAlt: Number.isFinite(maxAlt) ? maxAlt : null,
+    maxSpeed: Number.isFinite(maxSpeed) ? maxSpeed : null,
+    distance: dist
+  };
+}
+
+function downloadCSV(track) {
+  const header = 'lat,lon,alt,speed,heading\n';
+  const rows = track.points.map(p => [p.lat, p.lon, p.alt ?? '', p.speed ?? '', p.heading ?? ''].join(',')).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${track.id}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function showTrackInfo(track) {
   const panel = document.getElementById('trackInfo');
-  const rows = track.points.map(p => {
-    const lat = p.lat.toFixed(6);
-    const lon = p.lon.toFixed(6);
-    const alt = Number.isFinite(p.alt) ? p.alt.toFixed(1) : '';
-    const spd = Number.isFinite(p.speed) ? p.speed.toFixed(2) : '';
-    const hdg = Number.isFinite(p.heading) ? p.heading.toFixed(2) : '';
-    return `<tr><td>${lat}</td><td>${lon}</td><td>${alt}</td><td>${spd}</td><td>${hdg}</td></tr>`;
-  }).join('');
-  panel.innerHTML = `<h3>${track.id}</h3><table><thead><tr><th>Lat</th><th>Lon</th><th>Alt</th><th>Speed</th><th>Heading</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const { start, end, minAlt, maxAlt, maxSpeed, distance } = track.stats;
+  const fmt = p => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+  const items = [
+    `<li><strong>Points:</strong> ${track.points.length}</li>`,
+    `<li><strong>Start:</strong> ${fmt(start)}</li>`,
+    `<li><strong>End:</strong> ${fmt(end)}</li>`,
+    minAlt != null && maxAlt != null ? `<li><strong>Altitude:</strong> ${minAlt.toFixed(1)}–${maxAlt.toFixed(1)} m</li>` : '',
+    maxSpeed != null ? `<li><strong>Top speed:</strong> ${maxSpeed.toFixed(2)} m/s</li>` : '',
+    `<li><strong>Distance:</strong> ${(distance / 1000).toFixed(2)} km</li>`
+  ].filter(Boolean).join('');
+  panel.innerHTML = `<h3>${track.id}</h3><ul>${items}</ul><button id="csv${track.id}">Download CSV</button>`;
+  document.getElementById(`csv${track.id}`).addEventListener('click', () => downloadCSV(track));
 }
 
 function hashString(str) {
@@ -198,12 +250,16 @@ function hashString(str) {
 async function loadTracks() {
   const res = await fetch('/api/tracks');
   const data = await res.json();
-  tracks = data.map(t => ({
-    id: t.id,
-    points: t.points,
-    color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
-    visible: true
-  }));
+  tracks = data.map(t => {
+    const pts = t.points;
+    return {
+      id: t.id,
+      points: pts,
+      stats: computeStats(pts),
+      color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
+      visible: true
+    };
+  });
   worldBounds = computeWorldBounds();
   fitView();
   renderTrackList();

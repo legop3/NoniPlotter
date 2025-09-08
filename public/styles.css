@@ -130,22 +130,22 @@ main {
   font-size: 0.8rem;
   margin-bottom: 1rem;
 }
-
-#trackInfo table {
-  width: 100%;
-  border-collapse: collapse;
+#trackInfo ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-#trackInfo th, #trackInfo td {
+#trackInfo li {
+  display: flex;
+  justify-content: space-between;
   border-bottom: 1px solid var(--grid-color);
   padding: 0.1rem 0.2rem;
-  text-align: right;
 }
 
-#trackInfo th {
-  background: var(--menu-bg);
-  position: sticky;
-  top: 0;
+#trackInfo button {
+  margin-top: 0.5rem;
+  width: 100%;
 }
 
 .zoomControls {
