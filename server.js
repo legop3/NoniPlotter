@@ -24,10 +24,12 @@ function parsePlotFile(filePath) {
   for (const line of lines) {
     const parts = line.split('|');
     if (parts.length > 4) {
-      const lat = parseFloat(parts[3]);
-      const lon = parseFloat(parts[4]);
-      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        coords.push([lat, lon]);
+      const latRad = parseFloat(parts[3]);
+      const lonRad = parseFloat(parts[4]);
+      if (!Number.isNaN(latRad) && !Number.isNaN(lonRad)) {
+        const latDeg = latRad * (180 / Math.PI);
+        const lonDeg = lonRad * (180 / Math.PI);
+        coords.push([latDeg, lonDeg]);
       }
     }
   }
