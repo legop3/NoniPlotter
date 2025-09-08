@@ -23,23 +23,30 @@ async function parsePlotFile(filePath) {
     units = 'rad';
     lines.shift();
   }
-  const coords = [];
+  const points = [];
+  let maxAbs = 0;
   for (const line of lines) {
     const parts = line.split('|');
-    if (parts.length > 4) {
-      // Files store longitude before latitude; flip them so north maps upward
+    if (parts.length > 7) {
+      // column order: lon | lat | speed | heading | altitude
       let lon = parseFloat(parts[3]);
       let lat = parseFloat(parts[4]);
+      const speed = parseFloat(parts[5]);
+      const heading = parseFloat(parts[6]);
+      const alt = parseFloat(parts[7]);
       if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        if (units === 'rad') {
-          lat = (lat * 180) / Math.PI;
-          lon = (lon * 180) / Math.PI;
-        }
-        coords.push([lat, lon]);
+        maxAbs = Math.max(maxAbs, Math.abs(lat), Math.abs(lon));
+        points.push({ lat, lon, speed, heading, alt });
       }
     }
   }
-  return coords;
+  if (units === 'rad' || maxAbs <= Math.PI) {
+    points.forEach(p => {
+      p.lat = (p.lat * 180) / Math.PI;
+      p.lon = (p.lon * 180) / Math.PI;
+    });
+  }
+  return points;
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -53,8 +60,8 @@ app.get('/api/tracks', async (req, res) => {
         const full = path.join(plotsDir, f);
         const stat = await fs.stat(full);
         if (!stat.isFile()) return null;
-        const coords = await parsePlotFile(full);
-        return coords.length ? { id: f, coords } : null;
+        const points = await parsePlotFile(full);
+        return points.length ? { id: f, points } : null;
       });
     const tracks = (await Promise.all(trackPromises)).filter(Boolean);
     res.json(tracks);
@@ -76,10 +83,13 @@ app.get('/api/download', async (req, res) => {
     const trks = [];
     for (const id of ids) {
       const full = path.join(plotsDir, id);
-      const coords = await parsePlotFile(full).catch(() => []);
-      if (coords.length) {
-        const pts = coords
-          .map(([lat, lon]) => `<trkpt lat="${lat}" lon="${lon}" />`)
+      const points = await parsePlotFile(full).catch(() => []);
+      if (points.length) {
+        const pts = points
+          .map(p => {
+            const ele = Number.isFinite(p.alt) ? `<ele>${p.alt}</ele>` : '';
+            return `<trkpt lat="${p.lat}" lon="${p.lon}">${ele}</trkpt>`;
+          })
           .join('');
         trks.push(`<trk><name>${id}</name><trkseg>${pts}</trkseg></trk>`);
       }

@@ -80,7 +80,7 @@ window.addEventListener('resize', resizeCanvas);
 function computeWorldBounds() {
   const lats = [];
   const lons = [];
-  tracks.forEach(t => t.coords.forEach(([lat, lon]) => { lats.push(lat); lons.push(lon); }));
+  tracks.forEach(t => t.points.forEach(p => { lats.push(p.lat); lons.push(p.lon); }));
   if (!lats.length || !lons.length) return null;
   return {
     minLat: Math.min(...lats),
@@ -138,9 +138,9 @@ function draw() {
     if (!t.visible) return;
     ctx.strokeStyle = t.color;
     ctx.beginPath();
-    t.coords.forEach(([lat, lon], idx) => {
-      const x = (lon - view.originLon) * view.scale;
-      const y = (view.originLat - lat) * view.scale;
+    t.points.forEach((p, idx) => {
+      const x = (p.lon - view.originLon) * view.scale;
+      const y = (view.originLat - p.lat) * view.scale;
       if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
@@ -164,8 +164,27 @@ function renderTrackList() {
     label.appendChild(swatch);
     label.appendChild(document.createTextNode(' ' + t.id));
     li.appendChild(label);
+
+    const infoBtn = document.createElement('button');
+    infoBtn.textContent = 'info';
+    infoBtn.className = 'infoBtn';
+    infoBtn.addEventListener('click', () => showTrackInfo(t));
+    li.appendChild(infoBtn);
     list.appendChild(li);
   });
+}
+
+function showTrackInfo(track) {
+  const panel = document.getElementById('trackInfo');
+  const rows = track.points.map(p => {
+    const lat = p.lat.toFixed(6);
+    const lon = p.lon.toFixed(6);
+    const alt = Number.isFinite(p.alt) ? p.alt.toFixed(1) : '';
+    const spd = Number.isFinite(p.speed) ? p.speed.toFixed(2) : '';
+    const hdg = Number.isFinite(p.heading) ? p.heading.toFixed(2) : '';
+    return `<tr><td>${lat}</td><td>${lon}</td><td>${alt}</td><td>${spd}</td><td>${hdg}</td></tr>`;
+  }).join('');
+  panel.innerHTML = `<h3>${track.id}</h3><table><thead><tr><th>Lat</th><th>Lon</th><th>Alt</th><th>Speed</th><th>Heading</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function hashString(str) {
@@ -181,13 +200,14 @@ async function loadTracks() {
   const data = await res.json();
   tracks = data.map(t => ({
     id: t.id,
-    coords: t.coords,
+    points: t.points,
     color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
     visible: true
   }));
   worldBounds = computeWorldBounds();
   fitView();
   renderTrackList();
+  document.getElementById('trackInfo').innerHTML = '<em>Select a track above</em>';
   draw();
 }
 
