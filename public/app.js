@@ -337,25 +337,54 @@ document.getElementById('zoomOut').addEventListener('click', () => {
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  const factor = Math.exp(-e.deltaY * 0.001);
+  const factor = Math.exp(-e.deltaY * 0.002);
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   zoom(factor, x, y);
 }, { passive: false });
 
-// Touch support: pan with one finger, pinch with two
+// Touch support: pan with one finger, pinch with two, with a dash of inertia
 let pinchDist = 0;
 let pinchMidX = 0;
 let pinchMidY = 0;
+let velocityX = 0;
+let velocityY = 0;
+let lastMoveTime = 0;
+let momentumId = null;
+
+function applyMomentum() {
+  const decay = 0.95;
+  const step = () => {
+    view.originLon -= velocityX * 16 / view.scale;
+    view.originLat += velocityY * 16 / view.scale;
+    velocityX *= decay;
+    velocityY *= decay;
+    draw();
+    if (Math.abs(velocityX) > 0.01 || Math.abs(velocityY) > 0.01) {
+      momentumId = requestAnimationFrame(step);
+    } else {
+      momentumId = null;
+    }
+  };
+  if (momentumId) cancelAnimationFrame(momentumId);
+  momentumId = requestAnimationFrame(step);
+}
 
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
+  if (momentumId) {
+    cancelAnimationFrame(momentumId);
+    momentumId = null;
+  }
   if (e.touches.length === 1) {
     const t = e.touches[0];
     isDragging = true;
     lastX = t.clientX;
     lastY = t.clientY;
+    lastMoveTime = Date.now();
+    velocityX = 0;
+    velocityY = 0;
   } else if (e.touches.length === 2) {
     isDragging = false;
     const [t1, t2] = e.touches;
@@ -365,6 +394,8 @@ canvas.addEventListener('touchstart', e => {
     const rect = canvas.getBoundingClientRect();
     pinchMidX = (t1.clientX + t2.clientX) / 2 - rect.left;
     pinchMidY = (t1.clientY + t2.clientY) / 2 - rect.top;
+    velocityX = 0;
+    velocityY = 0;
   }
 }, { passive: false });
 
@@ -374,10 +405,17 @@ canvas.addEventListener('touchmove', e => {
     const t = e.touches[0];
     const dx = t.clientX - lastX;
     const dy = t.clientY - lastY;
+    const now = Date.now();
+    const dt = now - lastMoveTime;
     view.originLon -= dx / view.scale;
     view.originLat += dy / view.scale;
     lastX = t.clientX;
     lastY = t.clientY;
+    if (dt > 0) {
+      velocityX = dx / dt;
+      velocityY = dy / dt;
+    }
+    lastMoveTime = now;
     draw();
   } else if (e.touches.length === 2) {
     const [t1, t2] = e.touches;
@@ -402,11 +440,13 @@ canvas.addEventListener('touchmove', e => {
 canvas.addEventListener('touchend', e => {
   if (e.touches.length === 0) {
     isDragging = false;
+    applyMomentum();
   }
 }, { passive: false });
 
 canvas.addEventListener('touchcancel', () => {
   isDragging = false;
+  applyMomentum();
 }, { passive: false });
 
 window.addEventListener('mouseup', () => {
