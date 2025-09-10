@@ -51,6 +51,15 @@ main {
   touch-action: none;
 }
 
+#glCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 #menuToggle {
   position: fixed;
   top: 10px;
