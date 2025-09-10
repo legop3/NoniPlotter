@@ -40,6 +40,14 @@ main {
   height: 100%;
 }
 
+#map.grid {
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(to right, #000 1px, transparent 1px),
+    linear-gradient(to bottom, #000 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
 #menuToggle {
   position: fixed;
   top: 10px;

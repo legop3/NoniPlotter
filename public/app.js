@@ -1,6 +1,9 @@
 const map = L.map('map');
-const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
+const mapDiv = document.getElementById('map');
+const osmLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
 });
 osmLayer.addTo(map);
 
@@ -17,8 +20,10 @@ backdrop.addEventListener('click', toggleMenu);
 document.getElementById('mapToggle').addEventListener('click', () => {
   if (map.hasLayer(osmLayer)) {
     map.removeLayer(osmLayer);
+    mapDiv.classList.add('grid');
   } else {
     osmLayer.addTo(map);
+    mapDiv.classList.remove('grid');
   }
 });
 
