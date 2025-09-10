@@ -1,7 +1,9 @@
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs').promises;
+const fss = require('fs');
 const path = require('path');
+const sax = require('sax');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,37 +18,67 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-async function parsePlotFile(filePath) {
-  const lines = (await fs.readFile(filePath, 'utf8')).split(/\r?\n/).filter(Boolean);
-  let units = 'deg';
-  if (lines[0] && /^#?\s*units\s*=\s*rad/i.test(lines[0])) {
-    units = 'rad';
-    lines.shift();
+// Cache parsed tracks to avoid rereading files that haven't changed
+const trackCache = new Map();
+
+// Read a GPX file from disk and pluck out the tasty bits we need
+async function parsePlotFile(filePath, mtimeMs) {
+  if (mtimeMs === undefined) {
+    mtimeMs = (await fs.stat(filePath)).mtimeMs;
   }
-  const points = [];
-  let maxAbs = 0;
-  for (const line of lines) {
-    const parts = line.split('|');
-    if (parts.length > 7) {
-      // column order: lon | lat | speed | heading | altitude
-      let lon = parseFloat(parts[3]);
-      let lat = parseFloat(parts[4]);
-      const speed = parseFloat(parts[5]);
-      const heading = parseFloat(parts[6]);
-      const alt = parseFloat(parts[7]);
-      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        maxAbs = Math.max(maxAbs, Math.abs(lat), Math.abs(lon));
-        points.push({ lat, lon, speed, heading, alt });
+  const cached = trackCache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.points;
+  }
+  return new Promise((resolve, reject) => {
+    const points = [];
+    let current = null;
+    let tag = null;
+    const parser = sax.createStream(true, { trim: true, normalize: true });
+
+    parser.on('opentag', node => {
+      tag = node.name;
+      if (node.name === 'trkpt') {
+        current = {
+          lat: parseFloat(node.attributes.lat),
+          lon: parseFloat(node.attributes.lon)
+        };
       }
-    }
-  }
-  if (units === 'rad' || maxAbs <= Math.PI) {
-    points.forEach(p => {
-      p.lat = (p.lat * 180) / Math.PI;
-      p.lon = (p.lon * 180) / Math.PI;
     });
-  }
-  return points;
+    parser.on('text', text => {
+      if (!current || !tag) return;
+      switch (tag.toLowerCase()) {
+        case 'ele':
+          current.alt = parseFloat(text);
+          break;
+        case 'speed':
+        case 'gpxtpx:speed':
+          current.speed = parseFloat(text);
+          break;
+        case 'course':
+        case 'heading':
+          current.heading = parseFloat(text);
+          break;
+      }
+    });
+    parser.on('closetag', name => {
+      if (name === 'trkpt' && current) {
+        points.push(current);
+        current = null;
+      }
+      tag = null;
+    });
+    parser.on('error', err => {
+      parser.resume();
+      reject(err);
+    });
+    parser.on('end', () => {
+      trackCache.set(filePath, { mtimeMs, points });
+      resolve(points);
+    });
+
+    fss.createReadStream(filePath).pipe(parser);
+  });
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -60,7 +92,7 @@ app.get('/api/tracks', async (req, res) => {
         const full = path.join(plotsDir, f);
         const stat = await fs.stat(full);
         if (!stat.isFile()) return null;
-        const points = await parsePlotFile(full);
+        const points = await parsePlotFile(full, stat.mtimeMs).catch(() => []);
         return points.length ? { id: f, points } : null;
       });
     const tracks = (await Promise.all(trackPromises)).filter(Boolean);
@@ -83,7 +115,8 @@ app.get('/api/download', async (req, res) => {
     const trks = [];
     for (const id of ids) {
       const full = path.join(plotsDir, id);
-      const points = await parsePlotFile(full).catch(() => []);
+      const stat = await fs.stat(full).catch(() => null);
+      const points = stat ? await parsePlotFile(full, stat.mtimeMs).catch(() => []) : [];
       if (points.length) {
         const pts = points
           .map(p => {
