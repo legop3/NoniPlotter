@@ -16,37 +16,29 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-async function parsePlotFile(filePath) {
-  const lines = (await fs.readFile(filePath, 'utf8')).split(/\r?\n/).filter(Boolean);
-  let units = 'deg';
-  if (lines[0] && /^#?\s*units\s*=\s*rad/i.test(lines[0])) {
-    units = 'rad';
-    lines.shift();
-  }
-  const points = [];
-  let maxAbs = 0;
-  for (const line of lines) {
-    const parts = line.split('|');
-    if (parts.length > 7) {
-      // column order: lon | lat | speed | heading | altitude
-      let lon = parseFloat(parts[3]);
-      let lat = parseFloat(parts[4]);
-      const speed = parseFloat(parts[5]);
-      const heading = parseFloat(parts[6]);
-      const alt = parseFloat(parts[7]);
+async function parseGpxFile(filePath) {
+  try {
+    const xml = await fs.readFile(filePath, 'utf8');
+    const pattern =
+      '<trkpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*>([\\s\\S]*?)<\/trkpt>' +
+      '|<trkpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*\/>';
+    const regex = new RegExp(pattern, 'gi');
+    const points = [];
+    let m;
+    while ((m = regex.exec(xml))) {
+      const lat = parseFloat(m[1] || m[4]);
+      const lon = parseFloat(m[2] || m[5]);
+      const inner = m[3] || '';
+      const eleMatch = inner.match(/<ele>([^<]+)<\/ele>/i);
+      const alt = eleMatch ? parseFloat(eleMatch[1]) : undefined;
       if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        maxAbs = Math.max(maxAbs, Math.abs(lat), Math.abs(lon));
-        points.push({ lat, lon, speed, heading, alt });
+        points.push({ lat, lon, alt });
       }
     }
+    return points;
+  } catch {
+    return [];
   }
-  if (units === 'rad' || maxAbs <= Math.PI) {
-    points.forEach(p => {
-      p.lat = (p.lat * 180) / Math.PI;
-      p.lon = (p.lon * 180) / Math.PI;
-    });
-  }
-  return points;
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -55,12 +47,12 @@ app.get('/api/tracks', async (req, res) => {
   try {
     const files = await fs.readdir(plotsDir);
     const trackPromises = files
-      .filter(f => !f.startsWith('.'))
+      .filter(f => !f.startsWith('.') && f.toLowerCase().endsWith('.gpx'))
       .map(async f => {
         const full = path.join(plotsDir, f);
         const stat = await fs.stat(full);
         if (!stat.isFile()) return null;
-        const points = await parsePlotFile(full);
+        const points = await parseGpxFile(full);
         return points.length ? { id: f, points } : null;
       });
     const tracks = (await Promise.all(trackPromises)).filter(Boolean);
@@ -83,7 +75,7 @@ app.get('/api/download', async (req, res) => {
     const trks = [];
     for (const id of ids) {
       const full = path.join(plotsDir, id);
-      const points = await parsePlotFile(full).catch(() => []);
+      const points = await parseGpxFile(full).catch(() => []);
       if (points.length) {
         const pts = points
           .map(p => {
