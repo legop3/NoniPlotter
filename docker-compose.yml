@@ -6,6 +6,8 @@ services:
       pull: true
     image: noniplotter
     pull_policy: build
+    # Update the codebase before launching the server
+    command: sh -c "git pull && node server.js"
     ports:
       - "3000:3000"
     volumes:
