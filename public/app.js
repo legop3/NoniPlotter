@@ -337,12 +337,12 @@ document.getElementById('zoomOut').addEventListener('click', () => {
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  const factor = Math.exp(-e.deltaY * 0.001);
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   zoom(factor, x, y);
-});
+}, { passive: false });
 
 // Touch support: pan with one finger, pinch with two
 let pinchDist = 0;
@@ -366,7 +366,7 @@ canvas.addEventListener('touchstart', e => {
     pinchMidX = (t1.clientX + t2.clientX) / 2 - rect.left;
     pinchMidY = (t1.clientY + t2.clientY) / 2 - rect.top;
   }
-});
+}, { passive: false });
 
 canvas.addEventListener('touchmove', e => {
   e.preventDefault();
@@ -384,21 +384,30 @@ canvas.addEventListener('touchmove', e => {
     const dx = t1.clientX - t2.clientX;
     const dy = t1.clientY - t2.clientY;
     const dist = Math.hypot(dx, dy);
+    const rect = canvas.getBoundingClientRect();
+    const midX = (t1.clientX + t2.clientX) / 2 - rect.left;
+    const midY = (t1.clientY + t2.clientY) / 2 - rect.top;
+    const midDx = midX - pinchMidX;
+    const midDy = midY - pinchMidY;
+    view.originLon -= midDx / view.scale;
+    view.originLat += midDy / view.scale;
     const factor = dist / pinchDist;
-    zoom(factor, pinchMidX, pinchMidY);
+    zoom(factor, midX, midY);
     pinchDist = dist;
+    pinchMidX = midX;
+    pinchMidY = midY;
   }
-});
+}, { passive: false });
 
 canvas.addEventListener('touchend', e => {
   if (e.touches.length === 0) {
     isDragging = false;
   }
-});
+}, { passive: false });
 
 canvas.addEventListener('touchcancel', () => {
   isDragging = false;
-});
+}, { passive: false });
 
 window.addEventListener('mouseup', () => {
   isDragging = false;
