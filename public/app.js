@@ -227,16 +227,41 @@ function filterJumps(points) {
   const median = segLens[Math.floor(segLens.length / 2)] || 0;
   const maxDist = Math.max(1000, median * 10);
 
-  const cleaned = [points[0]];
+  // Split track into chunks wherever we see a huge leap.
+  const segments = [[points[0]]];
   for (let i = 1; i < points.length; i++) {
-    const last = cleaned[cleaned.length - 1];
+    const prev = points[i - 1];
     const cur = points[i];
-    const d = haversine(last, cur);
-    if (d <= maxDist) {
-      cleaned.push(cur);
+    if (haversine(prev, cur) > maxDist) {
+      segments.push([cur]);
+    } else {
+      segments[segments.length - 1].push(cur);
     }
   }
-  return cleaned;
+
+  // Toss out teeny clusters that are likely GPS ghosts.
+  const solidSegments = segments.filter(seg => seg.length >= 5);
+
+  // Within each surviving segment, prune solitary spikes.
+  const cleanedSegments = solidSegments.map(seg => {
+    if (seg.length < 3) return seg.slice();
+    const cleaned = [seg[0]];
+    for (let i = 1; i < seg.length - 1; i++) {
+      const a = seg[i - 1];
+      const b = seg[i];
+      const c = seg[i + 1];
+      const ab = haversine(a, b);
+      const bc = haversine(b, c);
+      const ac = haversine(a, c);
+      if (!(ab > maxDist && bc > maxDist && ac <= maxDist)) {
+        cleaned.push(b);
+      }
+    }
+    cleaned.push(seg[seg.length - 1]);
+    return cleaned;
+  });
+
+  return cleanedSegments.flat();
 }
 
 function computeStats(points) {
