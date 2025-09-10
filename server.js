@@ -2,10 +2,10 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs').promises;
 const path = require('path');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const plotsDir = path.join(__dirname, 'plots');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'cookies';
 
 // Make sure plots directory exists
 fs.mkdir(plotsDir, { recursive: true }).catch(() => {});
@@ -15,6 +15,14 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 const upload = multer({ storage });
+
+function requirePassword(req, res, next) {
+  const pass = req.headers['x-admin-password'];
+  if (pass !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
 
 async function parseGpxFile(filePath) {
   try {
@@ -62,8 +70,18 @@ app.get('/api/tracks', async (req, res) => {
   }
 });
 
-app.post('/api/upload', upload.single('plotfile'), (req, res) => {
+app.post('/api/upload', requirePassword, upload.single('plotfile'), (req, res) => {
   res.json({ status: 'ok' });
+});
+
+app.delete('/api/delete/:id', requirePassword, async (req, res) => {
+  const id = path.basename(req.params.id);
+  try {
+    await fs.unlink(path.join(plotsDir, id));
+    res.json({ status: 'ok' });
+  } catch {
+    res.status(404).json({ error: 'Not found' });
+  }
 });
 
 app.get('/api/download', async (req, res) => {

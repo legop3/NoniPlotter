@@ -10,6 +10,7 @@ const sidebar = document.getElementById('sidebar');
 const backdrop = document.getElementById('backdrop');
 const menuToggle = document.getElementById('menuToggle');
 const themeToggle = document.getElementById('themeToggle');
+const passwordInput = document.getElementById('adminPassword');
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -54,6 +55,7 @@ if (themeToggle) {
     setTheme(next);
   });
 }
+
 
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
@@ -170,6 +172,19 @@ function renderTrackList() {
     infoBtn.className = 'infoBtn';
     infoBtn.addEventListener('click', () => showTrackInfo(t));
     li.appendChild(infoBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'delete';
+    delBtn.className = 'deleteBtn';
+    delBtn.addEventListener('click', async () => {
+      const pwd = passwordInput ? passwordInput.value : '';
+      await fetch(`/api/delete/${encodeURIComponent(t.id)}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-password': pwd }
+      });
+      loadTracks();
+    });
+    li.appendChild(delBtn);
     list.appendChild(li);
   });
 }
@@ -270,7 +285,12 @@ async function loadTracks() {
 document.getElementById('uploadForm').addEventListener('submit', async e => {
   e.preventDefault();
   const formData = new FormData(e.target);
-  await fetch('/api/upload', { method: 'POST', body: formData });
+  const pwd = passwordInput ? passwordInput.value : '';
+  await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'x-admin-password': pwd },
+    body: formData
+  });
   e.target.reset();
   loadTracks();
 });
