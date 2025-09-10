@@ -6,9 +6,9 @@ services:
       - "3000:3000"
     volumes:
       - plots:/app/plots
-      environment:
-        - NODE_ENV=production
-        - ADMIN_PASSWORD=${ADMIN_PASSWORD:-cookies}
+    environment:
+      - NODE_ENV=production
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-cookies}
 
 volumes:
   plots:
