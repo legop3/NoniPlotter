@@ -56,13 +56,6 @@ if (themeToggle) {
   });
 }
 
-if (passwordInput) {
-  const saved = getCookie('admin-password');
-  if (saved) passwordInput.value = saved;
-  passwordInput.addEventListener('input', () => {
-    document.cookie = `admin-password=${encodeURIComponent(passwordInput.value)};path=/`;
-  });
-}
 
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
@@ -184,9 +177,10 @@ function renderTrackList() {
     delBtn.textContent = 'delete';
     delBtn.className = 'deleteBtn';
     delBtn.addEventListener('click', async () => {
+      const pwd = passwordInput ? passwordInput.value : '';
       await fetch(`/api/delete/${encodeURIComponent(t.id)}`, {
         method: 'DELETE',
-        credentials: 'same-origin'
+        headers: { 'x-admin-password': pwd }
       });
       loadTracks();
     });
@@ -291,10 +285,11 @@ async function loadTracks() {
 document.getElementById('uploadForm').addEventListener('submit', async e => {
   e.preventDefault();
   const formData = new FormData(e.target);
+  const pwd = passwordInput ? passwordInput.value : '';
   await fetch('/api/upload', {
     method: 'POST',
-    body: formData,
-    credentials: 'same-origin'
+    headers: { 'x-admin-password': pwd },
+    body: formData
   });
   e.target.reset();
   loadTracks();

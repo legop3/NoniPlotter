@@ -2,12 +2,10 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs').promises;
 const path = require('path');
-const cookieParser = require('cookie-parser');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const plotsDir = path.join(__dirname, 'plots');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'cookies';
 
 // Make sure plots directory exists
 fs.mkdir(plotsDir, { recursive: true }).catch(() => {});
@@ -18,10 +16,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.use(cookieParser());
-
 function requirePassword(req, res, next) {
-  const pass = req.cookies['admin-password'] || req.headers['x-admin-password'];
+  const pass = req.headers['x-admin-password'];
   if (pass !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
