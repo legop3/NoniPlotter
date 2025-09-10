@@ -16,6 +16,7 @@ const altToggle = document.getElementById('altitudeToggle');
 const passwordInput = document.getElementById('adminPassword');
 let colorByAltitude = altToggle ? altToggle.checked : true;
 glCanvas.style.display = colorByAltitude ? 'block' : 'none';
+const altLegend = document.getElementById('altLegend');
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -180,6 +181,37 @@ function altToRgb(alt, min, max) {
   return hslToRgb(hue, 100, 50);
 }
 
+function getAltRange() {
+  const mins = [];
+  const maxs = [];
+  tracks.forEach(t => {
+    if (!t.visible) return;
+    const { minAlt, maxAlt } = t.stats;
+    if (minAlt != null && maxAlt != null) {
+      mins.push(minAlt);
+      maxs.push(maxAlt);
+    }
+  });
+  if (!mins.length) return null;
+  return { min: Math.min(...mins), max: Math.max(...maxs) };
+}
+
+function updateAltLegend() {
+  if (!altLegend) return;
+  if (!colorByAltitude) {
+    altLegend.style.display = 'none';
+    return;
+  }
+  const range = getAltRange();
+  if (!range) {
+    altLegend.style.display = 'none';
+    return;
+  }
+  altLegend.style.display = 'flex';
+  altLegend.querySelector('.min').textContent = `${range.min.toFixed(1)} m`;
+  altLegend.querySelector('.max').textContent = `${range.max.toFixed(1)} m`;
+}
+
 function compileShader(type, src) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, src);
@@ -302,6 +334,7 @@ function draw() {
   } else {
     drawPlainTracks();
   }
+  updateAltLegend();
 }
 
 function renderTrackList() {

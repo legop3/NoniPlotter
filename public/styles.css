@@ -60,6 +60,27 @@ main {
   pointer-events: none;
 }
 
+#altLegend {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: none;
+  align-items: center;
+  font-size: 0.75rem;
+  background: var(--sidebar-bg);
+  color: var(--fg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+#altLegend .gradient {
+  width: 100px;
+  height: 10px;
+  margin: 0 6px;
+  background: linear-gradient(to right, hsl(240,100%,50%) 0%, hsl(0,100%,50%) 100%);
+  border: 1px solid var(--grid-color);
+}
+
 #menuToggle {
   position: fixed;
   top: 10px;
