@@ -68,7 +68,10 @@ async function parsePlotFile(filePath, mtimeMs) {
       }
       tag = null;
     });
-    parser.on('error', reject);
+    parser.on('error', err => {
+      parser.resume();
+      reject(err);
+    });
     parser.on('end', () => {
       trackCache.set(filePath, { mtimeMs, points });
       resolve(points);
@@ -89,7 +92,7 @@ app.get('/api/tracks', async (req, res) => {
         const full = path.join(plotsDir, f);
         const stat = await fs.stat(full);
         if (!stat.isFile()) return null;
-        const points = await parsePlotFile(full, stat.mtimeMs);
+        const points = await parsePlotFile(full, stat.mtimeMs).catch(() => []);
         return points.length ? { id: f, points } : null;
       });
     const tracks = (await Promise.all(trackPromises)).filter(Boolean);
