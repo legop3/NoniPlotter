@@ -16,35 +16,28 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// Read a GPX file from disk and pluck out the tasty bits we need
 async function parsePlotFile(filePath) {
-  const lines = (await fs.readFile(filePath, 'utf8')).split(/\r?\n/).filter(Boolean);
-  let units = 'deg';
-  if (lines[0] && /^#?\s*units\s*=\s*rad/i.test(lines[0])) {
-    units = 'rad';
-    lines.shift();
-  }
+  const xml = await fs.readFile(filePath, 'utf8');
   const points = [];
-  let maxAbs = 0;
-  for (const line of lines) {
-    const parts = line.split('|');
-    if (parts.length > 7) {
-      // column order: lon | lat | speed | heading | altitude
-      let lon = parseFloat(parts[3]);
-      let lat = parseFloat(parts[4]);
-      const speed = parseFloat(parts[5]);
-      const heading = parseFloat(parts[6]);
-      const alt = parseFloat(parts[7]);
-      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        maxAbs = Math.max(maxAbs, Math.abs(lat), Math.abs(lon));
-        points.push({ lat, lon, speed, heading, alt });
-      }
+  const re = /<trkpt[^>]*?lat="([^"]+)"[^>]*?lon="([^"]+)"[^>]*?>([\s\S]*?)<\/trkpt>/g;
+  let m;
+  while ((m = re.exec(xml))) {
+    const lat = parseFloat(m[1]);
+    const lon = parseFloat(m[2]);
+    const inner = m[3];
+    const altMatch = inner.match(/<ele>([^<]+)<\/ele>/);
+    const speedMatch = inner.match(/<(?:speed|gpxtpx:speed)>([^<]+)<\/[^>]+>/i);
+    const headMatch = inner.match(/<(?:course|heading)>([^<]+)<\/[^>]+>/i);
+    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+      points.push({
+        lat,
+        lon,
+        speed: speedMatch ? parseFloat(speedMatch[1]) : undefined,
+        heading: headMatch ? parseFloat(headMatch[1]) : undefined,
+        alt: altMatch ? parseFloat(altMatch[1]) : undefined
+      });
     }
-  }
-  if (units === 'rad' || maxAbs <= Math.PI) {
-    points.forEach(p => {
-      p.lat = (p.lat * 180) / Math.PI;
-      p.lon = (p.lon * 180) / Math.PI;
-    });
   }
   return points;
 }
