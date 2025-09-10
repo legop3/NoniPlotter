@@ -152,6 +152,11 @@ main {
   margin-top: 1rem;
 }
 
+#jumpLabel {
+  display: block;
+  margin-top: 0.5rem;
+}
+
 @media (max-width: 600px) {
   #menuToggle {
     display: block;

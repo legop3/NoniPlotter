@@ -11,6 +11,9 @@ const backdrop = document.getElementById('backdrop');
 const menuToggle = document.getElementById('menuToggle');
 const themeToggle = document.getElementById('themeToggle');
 const passwordInput = document.getElementById('adminPassword');
+const jumpToggle = document.getElementById('jumpFilter');
+let removeJumps = false;
+let currentTrackId = null;
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -53,6 +56,19 @@ if (themeToggle) {
   themeToggle.addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     setTheme(next);
+  });
+}
+
+if (jumpToggle) {
+  jumpToggle.addEventListener('change', () => {
+    removeJumps = jumpToggle.checked;
+    applyJumpFilter();
+    fitView();
+    draw();
+    if (currentTrackId) {
+      const t = tracks.find(tr => tr.id === currentTrackId);
+      if (t) showTrackInfo(t);
+    }
   });
 }
 
@@ -200,6 +216,54 @@ function haversine(a, b) {
   return 2 * R * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
+function filterJumps(points) {
+  if (points.length < 3) return points.slice();
+
+  const segLens = [];
+  for (let i = 1; i < points.length; i++) {
+    segLens.push(haversine(points[i - 1], points[i]));
+  }
+  segLens.sort((a, b) => a - b);
+  const median = segLens[Math.floor(segLens.length / 2)] || 0;
+  const maxDist = Math.max(1000, median * 10);
+
+  // Split track into chunks wherever we see a huge leap.
+  const segments = [[points[0]]];
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    if (haversine(prev, cur) > maxDist) {
+      segments.push([cur]);
+    } else {
+      segments[segments.length - 1].push(cur);
+    }
+  }
+
+  // Toss out teeny clusters that are likely GPS ghosts.
+  const solidSegments = segments.filter(seg => seg.length >= 5);
+
+  // Within each surviving segment, prune solitary spikes.
+  const cleanedSegments = solidSegments.map(seg => {
+    if (seg.length < 3) return seg.slice();
+    const cleaned = [seg[0]];
+    for (let i = 1; i < seg.length - 1; i++) {
+      const a = seg[i - 1];
+      const b = seg[i];
+      const c = seg[i + 1];
+      const ab = haversine(a, b);
+      const bc = haversine(b, c);
+      const ac = haversine(a, c);
+      if (!(ab > maxDist && bc > maxDist && ac <= maxDist)) {
+        cleaned.push(b);
+      }
+    }
+    cleaned.push(seg[seg.length - 1]);
+    return cleaned;
+  });
+
+  return cleanedSegments.flat();
+}
+
 function computeStats(points) {
   const start = points[0];
   const end = points[points.length - 1];
@@ -222,6 +286,14 @@ function computeStats(points) {
     maxSpeed: Number.isFinite(maxSpeed) ? maxSpeed : null,
     distance: dist
   };
+}
+
+function applyJumpFilter() {
+  tracks.forEach(t => {
+    t.points = removeJumps ? filterJumps(t.rawPoints) : t.rawPoints;
+    t.stats = computeStats(t.points);
+  });
+  worldBounds = computeWorldBounds();
 }
 
 function downloadCSV(track) {
@@ -252,6 +324,7 @@ function showTrackInfo(track) {
   ].filter(Boolean).join('');
   panel.innerHTML = `<h3>${track.id}</h3><ul>${items}</ul><button id="csv${track.id}">Download CSV</button>`;
   document.getElementById(`csv${track.id}`).addEventListener('click', () => downloadCSV(track));
+  currentTrackId = track.id;
 }
 
 function hashString(str) {
@@ -266,19 +339,19 @@ async function loadTracks() {
   const res = await fetch('/api/tracks');
   const data = await res.json();
   tracks = data.map(t => {
-    const pts = t.points;
     return {
       id: t.id,
-      points: pts,
-      stats: computeStats(pts),
+      rawPoints: t.points,
+      points: t.points,
       color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
       visible: true
     };
   });
-  worldBounds = computeWorldBounds();
+  applyJumpFilter();
   fitView();
   renderTrackList();
   document.getElementById('trackInfo').innerHTML = '<em>Select a track above</em>';
+  currentTrackId = null;
   draw();
 }
 
