@@ -228,20 +228,14 @@ function filterJumps(points) {
   const maxDist = Math.max(1000, median * 10);
 
   const cleaned = [points[0]];
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = cleaned[cleaned.length - 1];
+  for (let i = 1; i < points.length; i++) {
+    const last = cleaned[cleaned.length - 1];
     const cur = points[i];
-    const next = points[i + 1];
-    const dPrev = haversine(prev, cur);
-    const dNext = haversine(cur, next);
-    const dSkip = haversine(prev, next);
-
-    if (dPrev > maxDist && dNext > maxDist && dSkip <= maxDist) {
-      continue; // yeet the out-and-back spike
+    const d = haversine(last, cur);
+    if (d <= maxDist) {
+      cleaned.push(cur);
     }
-    cleaned.push(cur);
   }
-  cleaned.push(points[points.length - 1]);
   return cleaned;
 }
 
