@@ -13,6 +13,7 @@ const themeToggle = document.getElementById('themeToggle');
 const altToggle = document.getElementById('altitudeToggle');
 const passwordInput = document.getElementById('adminPassword');
 let colorByAltitude = altToggle ? altToggle.checked : true;
+const ALT_CANVAS_SCALE = 10000;
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -88,11 +89,25 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
+function computeBounds(points) {
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  points.forEach(p => {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lon < minLon) minLon = p.lon;
+    if (p.lon > maxLon) maxLon = p.lon;
+  });
+  return { minLat, maxLat, minLon, maxLon };
+}
+
 function computeWorldBounds() {
+  if (!tracks.length) return null;
   const lats = [];
   const lons = [];
-  tracks.forEach(t => t.points.forEach(p => { lats.push(p.lat); lons.push(p.lon); }));
-  if (!lats.length || !lons.length) return null;
+  tracks.forEach(t => {
+    lats.push(t.bounds.minLat, t.bounds.maxLat);
+    lons.push(t.bounds.minLon, t.bounds.maxLon);
+  });
   return {
     minLat: Math.min(...lats),
     maxLat: Math.max(...lats),
@@ -149,29 +164,46 @@ function altToColor(alt, min, max) {
   return `hsl(${hue}, 100%, 50%)`;
 }
 
+function buildAltCanvas(track) {
+  if (track.stats.minAlt == null || track.stats.maxAlt == null) return;
+  const { minLat, maxLat, minLon, maxLon } = track.bounds;
+  const width = Math.ceil((maxLon - minLon) * ALT_CANVAS_SCALE);
+  const height = Math.ceil((maxLat - minLat) * ALT_CANVAS_SCALE);
+  const off = document.createElement('canvas');
+  off.width = width || 1;
+  off.height = height || 1;
+  const octx = off.getContext('2d');
+  for (let i = 1; i < track.points.length; i++) {
+    const p1 = track.points[i - 1];
+    const p2 = track.points[i];
+    let alt = null;
+    if (Number.isFinite(p2.alt)) alt = p2.alt;
+    else if (Number.isFinite(p1.alt)) alt = p1.alt;
+    const color = alt !== null ? altToColor(alt, track.stats.minAlt, track.stats.maxAlt) : track.color;
+    octx.strokeStyle = color;
+    octx.beginPath();
+    const x1 = (p1.lon - minLon) * ALT_CANVAS_SCALE;
+    const y1 = (maxLat - p1.lat) * ALT_CANVAS_SCALE;
+    const x2 = (p2.lon - minLon) * ALT_CANVAS_SCALE;
+    const y2 = (maxLat - p2.lat) * ALT_CANVAS_SCALE;
+    octx.moveTo(x1, y1);
+    octx.lineTo(x2, y2);
+    octx.stroke();
+  }
+  track.altCanvas = { canvas: off, bounds: { minLon, maxLat, width, height } };
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
   tracks.forEach(t => {
     if (!t.visible) return;
-    if (colorByAltitude && t.stats.minAlt !== null && t.stats.maxAlt !== null) {
-      for (let i = 1; i < t.points.length; i++) {
-        const p1 = t.points[i - 1];
-        const p2 = t.points[i];
-        let alt = null;
-        if (Number.isFinite(p2.alt)) alt = p2.alt;
-        else if (Number.isFinite(p1.alt)) alt = p1.alt;
-        const color = alt !== null ? altToColor(alt, t.stats.minAlt, t.stats.maxAlt) : t.color;
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        const x1 = (p1.lon - view.originLon) * view.scale;
-        const y1 = (view.originLat - p1.lat) * view.scale;
-        const x2 = (p2.lon - view.originLon) * view.scale;
-        const y2 = (view.originLat - p2.lat) * view.scale;
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-      }
+    if (colorByAltitude && t.altCanvas) {
+      const { canvas: off, bounds } = t.altCanvas;
+      const scale = view.scale / ALT_CANVAS_SCALE;
+      const x = (bounds.minLon - view.originLon) * view.scale;
+      const y = (view.originLat - bounds.maxLat) * view.scale;
+      ctx.drawImage(off, x, y, bounds.width * scale, bounds.height * scale);
     } else {
       ctx.strokeStyle = t.color;
       ctx.beginPath();
@@ -303,13 +335,18 @@ async function loadTracks() {
   const data = await res.json();
   tracks = data.map(t => {
     const pts = t.points;
-    return {
+    const bounds = computeBounds(pts);
+    const track = {
       id: t.id,
       points: pts,
       stats: computeStats(pts),
+      bounds,
       color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
-      visible: true
+      visible: true,
+      altCanvas: null
     };
+    buildAltCanvas(track);
+    return track;
   });
   worldBounds = computeWorldBounds();
   fitView();
