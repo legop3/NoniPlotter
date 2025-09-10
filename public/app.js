@@ -13,7 +13,7 @@ const themeToggle = document.getElementById('themeToggle');
 const altToggle = document.getElementById('altitudeToggle');
 const passwordInput = document.getElementById('adminPassword');
 let colorByAltitude = altToggle ? altToggle.checked : true;
-const ALT_CANVAS_SCALE = 10000;
+const ALT_CANVAS_MAX_DIM = 2048;
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -167,11 +167,15 @@ function altToColor(alt, min, max) {
 function buildAltCanvas(track) {
   if (track.stats.minAlt == null || track.stats.maxAlt == null) return;
   const { minLat, maxLat, minLon, maxLon } = track.bounds;
-  const width = Math.ceil((maxLon - minLon) * ALT_CANVAS_SCALE);
-  const height = Math.ceil((maxLat - minLat) * ALT_CANVAS_SCALE);
+  const widthDeg = maxLon - minLon;
+  const heightDeg = maxLat - minLat;
+  const degRange = Math.max(widthDeg, heightDeg) || 1;
+  const scale = ALT_CANVAS_MAX_DIM / degRange;
+  const width = Math.ceil(widthDeg * scale) || 1;
+  const height = Math.ceil(heightDeg * scale) || 1;
   const off = document.createElement('canvas');
-  off.width = width || 1;
-  off.height = height || 1;
+  off.width = width;
+  off.height = height;
   const octx = off.getContext('2d');
   for (let i = 1; i < track.points.length; i++) {
     const p1 = track.points[i - 1];
@@ -182,15 +186,15 @@ function buildAltCanvas(track) {
     const color = alt !== null ? altToColor(alt, track.stats.minAlt, track.stats.maxAlt) : track.color;
     octx.strokeStyle = color;
     octx.beginPath();
-    const x1 = (p1.lon - minLon) * ALT_CANVAS_SCALE;
-    const y1 = (maxLat - p1.lat) * ALT_CANVAS_SCALE;
-    const x2 = (p2.lon - minLon) * ALT_CANVAS_SCALE;
-    const y2 = (maxLat - p2.lat) * ALT_CANVAS_SCALE;
+    const x1 = (p1.lon - minLon) * scale;
+    const y1 = (maxLat - p1.lat) * scale;
+    const x2 = (p2.lon - minLon) * scale;
+    const y2 = (maxLat - p2.lat) * scale;
     octx.moveTo(x1, y1);
     octx.lineTo(x2, y2);
     octx.stroke();
   }
-  track.altCanvas = { canvas: off, bounds: { minLon, maxLat, width, height } };
+  track.altCanvas = { canvas: off, bounds: { minLon, maxLat }, width, height, scale };
 }
 
 function draw() {
@@ -199,11 +203,11 @@ function draw() {
   tracks.forEach(t => {
     if (!t.visible) return;
     if (colorByAltitude && t.altCanvas) {
-      const { canvas: off, bounds } = t.altCanvas;
-      const scale = view.scale / ALT_CANVAS_SCALE;
+      const { canvas: off, bounds, width, height, scale: cScale } = t.altCanvas;
+      const scale = view.scale / cScale;
       const x = (bounds.minLon - view.originLon) * view.scale;
       const y = (view.originLat - bounds.maxLat) * view.scale;
-      ctx.drawImage(off, x, y, bounds.width * scale, bounds.height * scale);
+      ctx.drawImage(off, x, y, width * scale, height * scale);
     } else {
       ctx.strokeStyle = t.color;
       ctx.beginPath();
