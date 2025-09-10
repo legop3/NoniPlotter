@@ -10,7 +10,9 @@ const sidebar = document.getElementById('sidebar');
 const backdrop = document.getElementById('backdrop');
 const menuToggle = document.getElementById('menuToggle');
 const themeToggle = document.getElementById('themeToggle');
+const altToggle = document.getElementById('altitudeToggle');
 const passwordInput = document.getElementById('adminPassword');
+let colorByAltitude = altToggle ? altToggle.checked : true;
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -53,6 +55,13 @@ if (themeToggle) {
   themeToggle.addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     setTheme(next);
+  });
+}
+
+if (altToggle) {
+  altToggle.addEventListener('change', () => {
+    colorByAltitude = altToggle.checked;
+    draw();
   });
 }
 
@@ -133,19 +142,46 @@ function drawGrid() {
   }
 }
 
+function altToColor(alt, min, max) {
+  const range = max - min || 1;
+  const ratio = (alt - min) / range;
+  const hue = 240 - 240 * ratio;
+  return `hsl(${hue}, 100%, 50%)`;
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
   tracks.forEach(t => {
     if (!t.visible) return;
-    ctx.strokeStyle = t.color;
-    ctx.beginPath();
-    t.points.forEach((p, idx) => {
-      const x = (p.lon - view.originLon) * view.scale;
-      const y = (view.originLat - p.lat) * view.scale;
-      if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
+    if (colorByAltitude && t.stats.minAlt !== null && t.stats.maxAlt !== null) {
+      for (let i = 1; i < t.points.length; i++) {
+        const p1 = t.points[i - 1];
+        const p2 = t.points[i];
+        let alt = null;
+        if (Number.isFinite(p2.alt)) alt = p2.alt;
+        else if (Number.isFinite(p1.alt)) alt = p1.alt;
+        const color = alt !== null ? altToColor(alt, t.stats.minAlt, t.stats.maxAlt) : t.color;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        const x1 = (p1.lon - view.originLon) * view.scale;
+        const y1 = (view.originLat - p1.lat) * view.scale;
+        const x2 = (p2.lon - view.originLon) * view.scale;
+        const y2 = (view.originLat - p2.lat) * view.scale;
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+    } else {
+      ctx.strokeStyle = t.color;
+      ctx.beginPath();
+      t.points.forEach((p, idx) => {
+        const x = (p.lon - view.originLon) * view.scale;
+        const y = (view.originLat - p.lat) * view.scale;
+        if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
   });
 }
 
