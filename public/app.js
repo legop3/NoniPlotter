@@ -56,6 +56,14 @@ if (themeToggle) {
   });
 }
 
+if (passwordInput) {
+  const saved = getCookie('admin-password');
+  if (saved) passwordInput.value = saved;
+  passwordInput.addEventListener('input', () => {
+    document.cookie = `admin-password=${encodeURIComponent(passwordInput.value)};path=/`;
+  });
+}
+
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
   const worldY = view.originLat - centerY / view.scale;
@@ -176,10 +184,9 @@ function renderTrackList() {
     delBtn.textContent = 'delete';
     delBtn.className = 'deleteBtn';
     delBtn.addEventListener('click', async () => {
-      const pw = passwordInput ? passwordInput.value : '';
       await fetch(`/api/delete/${encodeURIComponent(t.id)}`, {
         method: 'DELETE',
-        headers: { 'x-admin-password': pw }
+        credentials: 'same-origin'
       });
       loadTracks();
     });
@@ -284,8 +291,11 @@ async function loadTracks() {
 document.getElementById('uploadForm').addEventListener('submit', async e => {
   e.preventDefault();
   const formData = new FormData(e.target);
-  const password = passwordInput ? passwordInput.value : '';
-  await fetch('/api/upload', { method: 'POST', body: formData, headers: { 'x-admin-password': password } });
+  await fetch('/api/upload', {
+    method: 'POST',
+    body: formData,
+    credentials: 'same-origin'
+  });
   e.target.reset();
   loadTracks();
 });

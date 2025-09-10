@@ -8,6 +8,7 @@ services:
       - plots:/app/plots
     environment:
       - NODE_ENV=production
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
 
 volumes:
   plots:
