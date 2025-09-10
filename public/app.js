@@ -216,16 +216,32 @@ function haversine(a, b) {
   return 2 * R * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
-function filterJumps(points, maxDist = 1000) {
-  if (!points.length) return [];
-  const cleaned = [points[0]];
+function filterJumps(points) {
+  if (points.length < 3) return points.slice();
+
+  const segLens = [];
   for (let i = 1; i < points.length; i++) {
-    const last = cleaned[cleaned.length - 1];
-    const cur = points[i];
-    if (haversine(last, cur) <= maxDist) {
-      cleaned.push(cur);
-    }
+    segLens.push(haversine(points[i - 1], points[i]));
   }
+  segLens.sort((a, b) => a - b);
+  const median = segLens[Math.floor(segLens.length / 2)] || 0;
+  const maxDist = Math.max(1000, median * 10);
+
+  const cleaned = [points[0]];
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = cleaned[cleaned.length - 1];
+    const cur = points[i];
+    const next = points[i + 1];
+    const dPrev = haversine(prev, cur);
+    const dNext = haversine(cur, next);
+    const dSkip = haversine(prev, next);
+
+    if (dPrev > maxDist && dNext > maxDist && dSkip <= maxDist) {
+      continue; // yeet the out-and-back spike
+    }
+    cleaned.push(cur);
+  }
+  cleaned.push(points[points.length - 1]);
   return cleaned;
 }
 
