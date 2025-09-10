@@ -11,6 +11,9 @@ const backdrop = document.getElementById('backdrop');
 const menuToggle = document.getElementById('menuToggle');
 const themeToggle = document.getElementById('themeToggle');
 const passwordInput = document.getElementById('adminPassword');
+const jumpToggle = document.getElementById('jumpFilter');
+let removeJumps = false;
+let currentTrackId = null;
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -53,6 +56,19 @@ if (themeToggle) {
   themeToggle.addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     setTheme(next);
+  });
+}
+
+if (jumpToggle) {
+  jumpToggle.addEventListener('change', () => {
+    removeJumps = jumpToggle.checked;
+    applyJumpFilter();
+    fitView();
+    draw();
+    if (currentTrackId) {
+      const t = tracks.find(tr => tr.id === currentTrackId);
+      if (t) showTrackInfo(t);
+    }
   });
 }
 
@@ -200,6 +216,19 @@ function haversine(a, b) {
   return 2 * R * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
+function filterJumps(points, maxDist = 1000) {
+  if (!points.length) return [];
+  const cleaned = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const last = cleaned[cleaned.length - 1];
+    const cur = points[i];
+    if (haversine(last, cur) <= maxDist) {
+      cleaned.push(cur);
+    }
+  }
+  return cleaned;
+}
+
 function computeStats(points) {
   const start = points[0];
   const end = points[points.length - 1];
@@ -222,6 +251,14 @@ function computeStats(points) {
     maxSpeed: Number.isFinite(maxSpeed) ? maxSpeed : null,
     distance: dist
   };
+}
+
+function applyJumpFilter() {
+  tracks.forEach(t => {
+    t.points = removeJumps ? filterJumps(t.rawPoints) : t.rawPoints;
+    t.stats = computeStats(t.points);
+  });
+  worldBounds = computeWorldBounds();
 }
 
 function downloadCSV(track) {
@@ -252,6 +289,7 @@ function showTrackInfo(track) {
   ].filter(Boolean).join('');
   panel.innerHTML = `<h3>${track.id}</h3><ul>${items}</ul><button id="csv${track.id}">Download CSV</button>`;
   document.getElementById(`csv${track.id}`).addEventListener('click', () => downloadCSV(track));
+  currentTrackId = track.id;
 }
 
 function hashString(str) {
@@ -266,19 +304,19 @@ async function loadTracks() {
   const res = await fetch('/api/tracks');
   const data = await res.json();
   tracks = data.map(t => {
-    const pts = t.points;
     return {
       id: t.id,
-      points: pts,
-      stats: computeStats(pts),
+      rawPoints: t.points,
+      points: t.points,
       color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
       visible: true
     };
   });
-  worldBounds = computeWorldBounds();
+  applyJumpFilter();
   fitView();
   renderTrackList();
   document.getElementById('trackInfo').innerHTML = '<em>Select a track above</em>';
+  currentTrackId = null;
   draw();
 }
 
