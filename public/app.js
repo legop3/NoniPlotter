@@ -1,5 +1,7 @@
 const canvas = document.getElementById('plotCanvas');
 const ctx = canvas.getContext('2d');
+const glCanvas = document.getElementById('glCanvas');
+let gl = null;
 let tracks = [];
 let worldBounds = null;
 let view = { scale: 1, originLat: 0, originLon: 0 };
@@ -10,7 +12,11 @@ const sidebar = document.getElementById('sidebar');
 const backdrop = document.getElementById('backdrop');
 const menuToggle = document.getElementById('menuToggle');
 const themeToggle = document.getElementById('themeToggle');
+const altToggle = document.getElementById('altitudeToggle');
 const passwordInput = document.getElementById('adminPassword');
+let colorByAltitude = altToggle ? altToggle.checked : true;
+glCanvas.style.display = colorByAltitude ? 'block' : 'none';
+const altLegend = document.getElementById('altLegend');
 
 function toggleMenu() {
   sidebar.classList.toggle('open');
@@ -56,6 +62,14 @@ if (themeToggle) {
   });
 }
 
+if (altToggle) {
+  altToggle.addEventListener('change', () => {
+    colorByAltitude = altToggle.checked;
+    glCanvas.style.display = colorByAltitude ? 'block' : 'none';
+    draw();
+  });
+}
+
 
 function zoom(factor, centerX, centerY) {
   const worldX = view.originLon + centerX / view.scale;
@@ -73,17 +87,35 @@ function resizeCanvas() {
   const centerLat = view.originLat - prevH / (2 * view.scale);
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
+  if (glCanvas) {
+    glCanvas.width = canvas.width;
+    glCanvas.height = canvas.height;
+  }
   view.originLon = centerLon - canvas.width / (2 * view.scale);
   view.originLat = centerLat + canvas.height / (2 * view.scale);
   draw();
 }
 window.addEventListener('resize', resizeCanvas);
 
+function computeBounds(points) {
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+  points.forEach(p => {
+    if (p.lat < minLat) minLat = p.lat;
+    if (p.lat > maxLat) maxLat = p.lat;
+    if (p.lon < minLon) minLon = p.lon;
+    if (p.lon > maxLon) maxLon = p.lon;
+  });
+  return { minLat, maxLat, minLon, maxLon };
+}
+
 function computeWorldBounds() {
+  if (!tracks.length) return null;
   const lats = [];
   const lons = [];
-  tracks.forEach(t => t.points.forEach(p => { lats.push(p.lat); lons.push(p.lon); }));
-  if (!lats.length || !lons.length) return null;
+  tracks.forEach(t => {
+    lats.push(t.bounds.minLat, t.bounds.maxLat);
+    lons.push(t.bounds.minLon, t.bounds.maxLon);
+  });
   return {
     minLat: Math.min(...lats),
     maxLat: Math.max(...lats),
@@ -133,9 +165,136 @@ function drawGrid() {
   }
 }
 
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawGrid();
+function hslToRgb(h, s, l) {
+  s /= 100;
+  l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0), f(8), f(4)];
+}
+
+function altToRgb(alt, min, max) {
+  const range = max - min || 1;
+  const ratio = (alt - min) / range;
+  const hue = 240 - 240 * ratio;
+  return hslToRgb(hue, 100, 50);
+}
+
+function getAltRange() {
+  const mins = [];
+  const maxs = [];
+  tracks.forEach(t => {
+    if (!t.visible) return;
+    const { minAlt, maxAlt } = t.stats;
+    if (minAlt != null && maxAlt != null) {
+      mins.push(minAlt);
+      maxs.push(maxAlt);
+    }
+  });
+  if (!mins.length) return null;
+  return { min: Math.min(...mins), max: Math.max(...maxs) };
+}
+
+function updateAltLegend() {
+  if (!altLegend) return;
+  if (!colorByAltitude) {
+    altLegend.style.display = 'none';
+    return;
+  }
+  const range = getAltRange();
+  if (!range) {
+    altLegend.style.display = 'none';
+    return;
+  }
+  altLegend.style.display = 'flex';
+  altLegend.querySelector('.min').textContent = `${range.min.toFixed(1)} m`;
+  altLegend.querySelector('.max').textContent = `${range.max.toFixed(1)} m`;
+}
+
+function compileShader(type, src) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, src);
+  gl.compileShader(shader);
+  return shader;
+}
+
+function initGL() {
+  gl = glCanvas.getContext('webgl');
+  if (!gl) return;
+  gl.clearColor(0, 0, 0, 0);
+  const vs = compileShader(gl.VERTEX_SHADER, `
+    attribute vec2 a_pos;
+    attribute vec3 a_color;
+    uniform float u_originLon;
+    uniform float u_originLat;
+    uniform float u_scale;
+    uniform float u_width;
+    uniform float u_height;
+    varying vec3 v_color;
+    void main() {
+      float x = (a_pos.x - u_originLon) * u_scale;
+      float y = (u_originLat - a_pos.y) * u_scale;
+      float clipX = (x / u_width) * 2.0 - 1.0;
+      float clipY = (y / u_height) * -2.0 + 1.0;
+      gl_Position = vec4(clipX, clipY, 0.0, 1.0);
+      v_color = a_color;
+    }
+  `);
+  const fs = compileShader(gl.FRAGMENT_SHADER, `
+    precision mediump float;
+    varying vec3 v_color;
+    void main() {
+      gl_FragColor = vec4(v_color, 1.0);
+    }
+  `);
+  const program = gl.createProgram();
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  gl.useProgram(program);
+  gl.attrs = {
+    pos: gl.getAttribLocation(program, 'a_pos'),
+    color: gl.getAttribLocation(program, 'a_color')
+  };
+  gl.enableVertexAttribArray(gl.attrs.pos);
+  gl.enableVertexAttribArray(gl.attrs.color);
+  gl.uniforms = {
+    originLon: gl.getUniformLocation(program, 'u_originLon'),
+    originLat: gl.getUniformLocation(program, 'u_originLat'),
+    scale: gl.getUniformLocation(program, 'u_scale'),
+    width: gl.getUniformLocation(program, 'u_width'),
+    height: gl.getUniformLocation(program, 'u_height')
+  };
+}
+
+function buildGlTrack(track) {
+  if (!gl) return;
+  const data = new Float32Array(track.points.length * 5);
+  const { minAlt, maxAlt } = track.stats;
+  let defaultRgb = [0, 0, 0];
+  const m = /hsl\((\d+),/.exec(track.color);
+  if (m) defaultRgb = hslToRgb(parseFloat(m[1]), 100, 60);
+  track.points.forEach((p, i) => {
+    const base = i * 5;
+    data[base] = p.lon;
+    data[base + 1] = p.lat;
+    let rgb = defaultRgb;
+    if (Number.isFinite(p.alt) && minAlt != null && maxAlt != null) {
+      rgb = altToRgb(p.alt, minAlt, maxAlt);
+    }
+    data[base + 2] = rgb[0];
+    data[base + 3] = rgb[1];
+    data[base + 4] = rgb[2];
+  });
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+  track.glBuffer = buffer;
+  track.glCount = track.points.length;
+}
+
+function drawPlainTracks() {
   tracks.forEach(t => {
     if (!t.visible) return;
     ctx.strokeStyle = t.color;
@@ -147,6 +306,35 @@ function draw() {
     });
     ctx.stroke();
   });
+}
+
+function drawGLTracks() {
+  if (!gl) return;
+  gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.uniform1f(gl.uniforms.originLon, view.originLon);
+  gl.uniform1f(gl.uniforms.originLat, view.originLat);
+  gl.uniform1f(gl.uniforms.scale, view.scale);
+  gl.uniform1f(gl.uniforms.width, glCanvas.width);
+  gl.uniform1f(gl.uniforms.height, glCanvas.height);
+  tracks.forEach(t => {
+    if (!t.visible || !t.glBuffer) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, t.glBuffer);
+    gl.vertexAttribPointer(gl.attrs.pos, 2, gl.FLOAT, false, 20, 0);
+    gl.vertexAttribPointer(gl.attrs.color, 3, gl.FLOAT, false, 20, 8);
+    gl.drawArrays(gl.LINE_STRIP, 0, t.glCount);
+  });
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+  if (colorByAltitude) {
+    drawGLTracks();
+  } else {
+    drawPlainTracks();
+  }
+  updateAltLegend();
 }
 
 function renderTrackList() {
@@ -267,13 +455,19 @@ async function loadTracks() {
   const data = await res.json();
   tracks = data.map(t => {
     const pts = t.points;
-    return {
+    const bounds = computeBounds(pts);
+    const track = {
       id: t.id,
       points: pts,
       stats: computeStats(pts),
+      bounds,
       color: `hsl(${hashString(t.id) % 360}, 100%, 60%)`,
-      visible: true
+      visible: true,
+      glBuffer: null,
+      glCount: 0
     };
+    buildGlTrack(track);
+    return track;
   });
   worldBounds = computeWorldBounds();
   fitView();
@@ -455,6 +649,7 @@ window.addEventListener('mouseup', () => {
 });
 
 initTheme();
+initGL();
 resizeCanvas();
 canvas.style.cursor = 'grab';
 loadTracks();

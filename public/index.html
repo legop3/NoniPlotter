@@ -11,6 +11,8 @@
     <div id="canvasContainer">
       <button id="menuToggle">☰</button>
       <canvas id="plotCanvas"></canvas>
+      <canvas id="glCanvas"></canvas>
+      <div id="altLegend"><span class="min"></span><div class="gradient"></div><span class="max"></span></div>
     </div>
     <div id="backdrop"></div>
     <aside id="sidebar">
@@ -26,6 +28,7 @@
         <button type="button" id="zoomIn">Zoom In</button>
         <button type="button" id="zoomOut">Zoom Out</button>
       </div>
+      <label><input type="checkbox" id="altitudeToggle" checked> Altitude colors</label>
       <button type="button" id="downloadBtn">Download Selected</button>
       <button type="button" id="themeToggle">Toggle Theme</button>
     </aside>
