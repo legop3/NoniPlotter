@@ -44,8 +44,9 @@ function escapeHtml(str) {
 }
 
 function renderLegacyPage({ title, heading, message, status }) {
-  const pageTitle = title || heading || 'NoniPlotter';
-  const color = status === 'error' ? '#8b0000' : '#064600';
+  const pageTitle = escapeHtml(title || heading || 'NoniPlotter');
+  const safeHeading = escapeHtml(heading || 'NoniPlotter');
+  const accent = status === 'error' ? '#8b2b2b' : '#2f6a4e';
   return [
     '<!DOCTYPE html>',
     '<html>',
@@ -53,20 +54,25 @@ function renderLegacyPage({ title, heading, message, status }) {
     '  <meta charset="utf-8" />',
     `  <title>${pageTitle}</title>`,
     '  <style type="text/css">',
-    '    body { background: #fdf9f2; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif; margin: 2em; }',
-    '    .panel { border: 1px solid #444; padding: 1em; max-width: 32em; background: #fff; }',
-    '    h1 { font-size: 1.4em; color: ' + color + '; margin-top: 0; }',
-    '    p { line-height: 1.4; }',
-    '    .links { margin-top: 1.5em; }',
+    '    html { background: #f5f2e8; }',
+    '    body { margin: 0; padding: 0; color: #1f1f1f; font-family: "Trebuchet MS", Arial, sans-serif; font-size: 16px; line-height: 1.45; }',
+    '    .wrap { max-width: 24em; margin: 0 auto; padding: 1.1em 1.1em 1.6em; }',
+    '    .panel { border: 1px solid #67624d; background: #fffdf6; padding: 0.9em 1em 1em; }',
+    '    h1 { font-size: 1.35em; margin: 0 0 0.5em 0; color: ' + accent + '; }',
+    '    p { margin: 0.55em 0; }',
+    '    .links { margin-top: 1em; font-size: 0.85em; }',
+    '    .links a { color: #2f6a4e; }',
     '  </style>',
     '</head>',
     '<body>',
-    '  <div class="panel">',
-    `    <h1>${heading}</h1>`,
-    `    <p>${message}</p>`,
-    '    <div class="links">',
-    '      <p><a href="/retro-upload.html">Return to the retro upload form</a></p>',
-    '      <p><a href="/">Back to the fancy map</a></p>',
+    '  <div class="wrap">',
+    '    <div class="panel">',
+    `      <h1>${safeHeading}</h1>`,
+    `      <p>${message}</p>`,
+    '      <div class="links">',
+    '        <p><a href="/retro-upload.html">Return to the retro upload form</a></p>',
+    '        <p><a href="/">Back to the fancy map</a></p>',
+    '      </div>',
     '    </div>',
     '  </div>',
     '</body>',
