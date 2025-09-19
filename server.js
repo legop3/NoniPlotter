@@ -24,6 +24,62 @@ function requirePassword(req, res, next) {
   next();
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, char => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
+function renderLegacyPage({ title, heading, message, status }) {
+  const pageTitle = escapeHtml(title || heading || 'NoniPlotter');
+  const safeHeading = escapeHtml(heading || 'NoniPlotter');
+  const accent = status === 'error' ? '#8b2b2b' : '#2f6a4e';
+  return [
+    '<!DOCTYPE html>',
+    '<html>',
+    '<head>',
+    '  <meta charset="utf-8" />',
+    `  <title>${pageTitle}</title>`,
+    '  <style type="text/css">',
+    '    html { background: #f5f2e8; }',
+    '    body { margin: 0; padding: 0; color: #1f1f1f; font-family: "Trebuchet MS", Arial, sans-serif; font-size: 16px; line-height: 1.45; }',
+    '    .wrap { max-width: 24em; margin: 0 auto; padding: 1.1em 1.1em 1.6em; }',
+    '    .panel { border: 1px solid #67624d; background: #fffdf6; padding: 0.9em 1em 1em; }',
+    '    h1 { font-size: 1.35em; margin: 0 0 0.5em 0; color: ' + accent + '; }',
+    '    p { margin: 0.55em 0; }',
+    '    .links { margin-top: 1em; font-size: 0.85em; }',
+    '    .links a { color: #2f6a4e; }',
+    '  </style>',
+    '</head>',
+    '<body>',
+    '  <div class="wrap">',
+    '    <div class="panel">',
+    `      <h1>${safeHeading}</h1>`,
+    `      <p>${message}</p>`,
+    '      <div class="links">',
+    '        <p><a href="/retro-upload.html">Return to the retro upload form</a></p>',
+    '        <p><a href="/">Back to the fancy map</a></p>',
+    '      </div>',
+    '    </div>',
+    '  </div>',
+    '</body>',
+    '</html>'
+  ].join('\n');
+}
+
 async function parseGpxFile(filePath) {
   try {
     const xml = await fs.readFile(filePath, 'utf8');
@@ -72,6 +128,51 @@ app.get('/api/tracks', async (req, res) => {
 
 app.post('/api/upload', requirePassword, upload.single('plotfile'), (req, res) => {
   res.json({ status: 'ok' });
+});
+
+app.post('/retro-upload', upload.single('plotfile'), async (req, res) => {
+  const rawPassword = req.body && typeof req.body.password === 'string' ? req.body.password : '';
+  const password = rawPassword.trim();
+  const file = req.file;
+
+  if (password !== ADMIN_PASSWORD) {
+    if (file) {
+      await fs.unlink(file.path).catch(() => {});
+    }
+    return res
+      .status(401)
+      .send(
+        renderLegacyPage({
+          title: 'Upload failed',
+          heading: 'Password incorrect',
+          message: 'The password did not match. Please double-check the shared secret and try again.',
+          status: 'error'
+        })
+      );
+  }
+
+  if (!file) {
+    return res
+      .status(400)
+      .send(
+        renderLegacyPage({
+          title: 'No file uploaded',
+          heading: 'Nothing was uploaded',
+          message: 'We did not receive a GPX file. Please choose a file and submit the form again.',
+          status: 'error'
+        })
+      );
+  }
+
+  const safeName = escapeHtml(file.originalname || file.filename || 'your GPX file');
+  res.send(
+    renderLegacyPage({
+      title: 'Upload complete',
+      heading: 'Upload complete',
+      message: `The file <strong>${safeName}</strong> is now tucked safely into the plot stash.`,
+      status: 'success'
+    })
+  );
 });
 
 app.delete('/api/delete/:id', requirePassword, async (req, res) => {

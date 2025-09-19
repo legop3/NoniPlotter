@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoniPlotter Retro Upload</title>
+  <style type="text/css">
+    html { background: #f5f2e8; }
+    body {
+      margin: 0;
+      padding: 0;
+      color: #1f1f1f;
+      font-family: "Trebuchet MS", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+    .wrap {
+      max-width: 24em;
+      margin: 0 auto;
+      padding: 1.1em 1.1em 1.6em;
+    }
+    h1 { font-size: 1.35em; margin: 0 0 0.5em 0; color: #2f6a4e; }
+    p { margin: 0.55em 0; }
+    form {
+      border: 1px solid #67624d;
+      background: #fffdf6;
+      padding: 0.85em 0.95em 1em;
+      margin-top: 1em;
+    }
+    label { display: block; margin-bottom: 0.85em; }
+    .label-text { display: block; margin-bottom: 0.3em; font-weight: bold; font-size: 0.95em; }
+    input[type="file"], input[type="password"] {
+      width: 100%;
+      font-size: 0.95em;
+      padding: 0.45em;
+      border: 1px solid #8b8875;
+      background: #fffefb;
+    }
+    input[type="submit"] {
+      width: 100%;
+      margin-top: 0.35em;
+      padding: 0.55em;
+      font-size: 0.95em;
+      background: #2f6a4e;
+      color: #fff;
+      border: 0;
+      letter-spacing: 0.02em;
+    }
+    .note { font-size: 0.85em; color: #494738; margin-top: 1em; }
+    .back-link { margin-top: 1.4em; font-size: 0.85em; }
+    .back-link a { color: #2f6a4e; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Retro Uploader</h1>
+    <p>
+      This no-fuss page speaks fluent HTML 4 so the elders of the browser realm can still feed GPX
+      tracks to NoniPlotter.
+    </p>
+    <form action="/retro-upload" method="post" enctype="multipart/form-data">
+      <label>
+        <span class="label-text">Admin password</span>
+        <input type="password" name="password" />
+      </label>
+      <label>
+        <span class="label-text">GPX file</span>
+        <input type="file" name="plotfile" />
+      </label>
+      <input type="submit" value="Send file" />
+    </form>
+    <p class="note">
+      Files march straight into the shared <code>plots</code> directory, just like the jazzy modern uploader.
+    </p>
+    <p class="back-link"><a href="/">Return to the modern interface</a></p>
+  </div>
+</body>
+</html>

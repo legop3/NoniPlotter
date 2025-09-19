@@ -147,6 +147,15 @@ main {
   padding: 0.25rem 0.5rem;
 }
 
+#sidebar .legacyLink {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+
+#sidebar .legacyLink a {
+  color: var(--fg);
+}
+
 #sidebar .infoBtn {
   width: auto;
   margin-left: 0.5rem;
